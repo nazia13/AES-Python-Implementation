@@ -17,10 +17,6 @@ def GenerateKey():
 	Key 	= format(Genbits,'x')
 	return Key 
 
-
-
-
-
 def KeyExpansionAlgorithm(Key, KeyMatrix,RoundConstIndex):
 	StateSize = (4,4)
 	StateMatrix = np.zeros(StateSize)
@@ -33,16 +29,14 @@ def KeyExpansionAlgorithm(Key, KeyMatrix,RoundConstIndex):
 		KeyMatrix[RoundConstIndex,i/2] = ByteExtracted
 		StateMatrix[(i/2)%4,i/8] = ByteExtracted
 
-	# print Key 
-	# print KeyMatrix
-	print StateMatrix
-	# print "============="
+	#print StateMatrix
+	# print "===================================================="
 
 	#Step 1 of KeyGen : Rotate the Last column
 	RotArray = StateMatrix[:,3]
 	RotArray = np.roll(RotArray,-1)
 	# print RotArray
-	# print "============="
+	# print "===================================================="
 
 
 	#Step 2 of KeyGen : Substitute the Rotated Column with the corresponding SBOX values
@@ -51,7 +45,7 @@ def KeyExpansionAlgorithm(Key, KeyMatrix,RoundConstIndex):
 		SBOXrow = int(i%16)
 		RotArray[ArrayIndex] = sboxTable[SBOXcol,SBOXrow]
 		# print RotArray
-		
+	# print "===================================================="
 
 	#Step 3 of KeyGen : For the first element, XOR with the Round Constant
 		if ArrayIndex == 0:
@@ -63,31 +57,36 @@ def KeyExpansionAlgorithm(Key, KeyMatrix,RoundConstIndex):
 			# print RotArray[ArrayIndex]
 		ArrayIndex = ArrayIndex + 1
 
+	# print "===================================================="
+
 	#Step 4 of KeyGen : XOR each column of the State Matrix with the RotArray
+	ArrayToXORWith = np.zeros(4)
+	ArrayToXORWith = RotArray
+	
 	for ColumnSelector in xrange(0,4):
 		ColumnToXor = StateMatrix[:,ColumnSelector]
 		for ElementSelector in xrange(0,4):
-			ElementToXOR = "{0:08b}".format(int(ColumnToXor[ElementSelector]))
-			RotArrayToXOR = "{0:08b}".format(int(RotArray[ElementSelector]))
-			StateMatrix[ElementSelector,ColumnSelector]	 = int(ElementToXOR,2) ^ int(RotArrayToXOR,2)
+			ElementToXORfromStateMatrix = "{0:08b}".format(int(ColumnToXor[ElementSelector]))
+			ElementToXORfromPrevColumn  = "{0:08b}".format(int(ArrayToXORWith[ElementSelector]))
+			StateMatrix[ElementSelector,ColumnSelector]	 = int(ElementToXORfromStateMatrix,2) ^ int(ElementToXORfromPrevColumn,2)
+		ArrayToXORWith = StateMatrix[:,ColumnSelector]
 
-	print StateMatrix
-	# print RotArray
 
-		# SBOXcol = int((hex(i))[2],16)
-		# SBOXrow = int((hex(i))[3],16)
-		# print SBOXcol,SBOXrow
-		# RotArray[i] = int(sboxTable[SBOXcol,SBOXrow])
-		# TargetRow = SBOXrow
-		# TargetColumn = SBOXcol
-		# a = int(sboxTable[TargetColumn,TargetRow])
+	NewRoundKey = (StateMatrix.transpose()).reshape(1,16)
+	#print NewRoundKey
+	NextRoundKey = ""
+	
+	for i in NewRoundKey[0]:
+		HexChar = "{0:02x}".format(int(i))
+		NextRoundKey = NextRoundKey + HexChar
+		#Hexchar = hex(i)
+		#print Hexchar
 
-		# RotArray[i]=int(a)
+	#print NextRoundKey
 
-	# print KeyMatrix
-	# print Key
-	return RotArray,KeyMatrix
+	return NextRoundKey,KeyMatrix
 
+	# print "===================================================="
 	
 def SetupPhase():
 	RoundConstIndex = 0
@@ -100,10 +99,13 @@ def SetupPhase():
 	PT = CreateMessage(PT_Length)
 	K  = GenerateKey()
 
-	K = "00000000000000000000000000000000" 
-	K,KeyMatrix = KeyExpansionAlgorithm(K, KeyMatrix,RoundConstIndex)
-
-
+	#K = "ffffffffffffffffffffffffffffffff" 
+	
+	K= "000102030405060708090a0b0c0d0e0f"
+	print K
+	for RoundConstIndex in xrange(0,11):
+		K,KeyMatrix = KeyExpansionAlgorithm(K, KeyMatrix,RoundConstIndex)
+	print KeyMatrix
 
 sbox = np.zeros(256)
 sbox[:] = [0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -124,7 +126,7 @@ sbox[:] = [0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2
 0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16 ]
 sboxTable = sbox.reshape((16,16))
 RoundConstants = np.zeros(10)
-RoundConstants = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36] 
+RoundConstants = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x00] 
 
 
 SetupPhase()

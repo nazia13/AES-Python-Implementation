@@ -1,114 +1,107 @@
-#Implementation of AES on Python
+# Implementation of AES on Python
 import math
 import numpy as np
 import random
 
 
-def CreateMessage(k):
-	plaintext = random.getrandbits(k)
+def CreateMessage(PlainText_Length):
+	plaintext = random.getrandbits(PlainText_Length)
 	return plaintext
+
 
 def SetMessageLength():
 	plaintext_length = input("Please Enter size of message to be encrypted: ")
 	return plaintext_length
 
-def GenerateKey():
+
+def GenerateMasterKey():
 	Genbits = random.getrandbits(128)
-	Key 	= format(Genbits,'x')
-	return Key 
+	Key     = format(Genbits, 'x')
+	return Key
 
-def KeyExpansionAlgorithm(Key, KeyMatrix,RoundConstIndex):
-	StateSize = (4,4)
+
+def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
+	StateSize   = (4, 4)
 	StateMatrix = np.zeros(StateSize)
-	ArrayIndex = 0
+	ArrayIndex  = 0
 
-	#Creating State Matrix and adding Key to KeyMatrix
+#============================================================================================================
+#============================================================================================================
+	# Step 0 of KeyGen : Creating State Matrix and adding the previous Round Key to KeyMatrix
 
 	for i in range(0, len(Key), 2):
-		ByteExtracted = int(Key[i:i+2],16)
-		KeyMatrix[RoundConstIndex,i/2] = ByteExtracted
-		StateMatrix[(i/2)%4,i/8] = ByteExtracted
+		ByteExtracted                       = int(Key[i:i + 2], 16)
+		KeyMatrix[CurrentRoundIndex, i / 2] = ByteExtracted
+		StateMatrix[(i / 2) % 4, i / 8]     = ByteExtracted
 
-	#print StateMatrix
-	# print "===================================================="
+#============================================================================================================
+#============================================================================================================
+	# Step 1 of KeyGen : Rotate the Last column
+	LastColumnInStateMatrix = StateMatrix[:, 3]
+	LastColumnInStateMatrix = np.roll(LastColumnInStateMatrix, -1)
 
-	#Step 1 of KeyGen : Rotate the Last column
-	RotArray = StateMatrix[:,3]
-	RotArray = np.roll(RotArray,-1)
-	# print RotArray
-	# print "===================================================="
+#============================================================================================================
+#============================================================================================================
+	# Step 2 of KeyGen : Substitute the Rotated Column with the corresponding
+	# SBOX values
+	for element in LastColumnInStateMatrix:
+		CorrespondingColumnInSBOX              = int(element / 16)
+		CorrespondingRowInSBOX                 = int(element % 16)
+		LastColumnInStateMatrix[ArrayIndex]    = sboxTable[CorrespondingColumnInSBOX, CorrespondingRowInSBOX]
 
-
-	#Step 2 of KeyGen : Substitute the Rotated Column with the corresponding SBOX values
-	for i in RotArray:
-		SBOXcol = int(i/16)
-		SBOXrow = int(i%16)
-		RotArray[ArrayIndex] = sboxTable[SBOXcol,SBOXrow]
-		# print RotArray
-	# print "===================================================="
-
-	#Step 3 of KeyGen : For the first element, XOR with the Round Constant
+#============================================================================================================
+#============================================================================================================
+	# Step 3 of KeyGen : For the first element, XOR with the Round Constant
 		if ArrayIndex == 0:
-			RoundMultiplier = "{0:08b}".format(int(RoundConstants[RoundConstIndex]))
-			ToXOR = "{0:08b}".format(int(RotArray[ArrayIndex]))
-			# print ToXOR
-			# print RoundMultiplier
-			RotArray[ArrayIndex] = int(ToXOR,2) ^ int(RoundMultiplier,2)
-			# print RotArray[ArrayIndex]
+			RoundMultiplier                     = "{0:08b}".format(int(RoundConstants[CurrentRoundIndex]))
+			FirstElementinLastColumn            = "{0:08b}".format(int(LastColumnInStateMatrix[ArrayIndex]))
+			LastColumnInStateMatrix[ArrayIndex] = int(FirstElementinLastColumn, 2) ^ int(RoundMultiplier, 2)
 		ArrayIndex = ArrayIndex + 1
 
-	# print "===================================================="
-
-	#Step 4 of KeyGen : XOR each column of the State Matrix with the RotArray
+#============================================================================================================
+#============================================================================================================
+	# Step 4 of KeyGen : XOR each column of the State Matrix with the LatestGeneratedColumn
 	ArrayToXORWith = np.zeros(4)
-	ArrayToXORWith = RotArray
-	
-	for ColumnSelector in xrange(0,4):
-		ColumnToXor = StateMatrix[:,ColumnSelector]
-		for ElementSelector in xrange(0,4):
-			ElementToXORfromStateMatrix = "{0:08b}".format(int(ColumnToXor[ElementSelector]))
-			ElementToXORfromPrevColumn  = "{0:08b}".format(int(ArrayToXORWith[ElementSelector]))
-			StateMatrix[ElementSelector,ColumnSelector]	 = int(ElementToXORfromStateMatrix,2) ^ int(ElementToXORfromPrevColumn,2)
-		ArrayToXORWith = StateMatrix[:,ColumnSelector]
+	ArrayToXORWith = LastColumnInStateMatrix
 
+	for ColumnSelector in xrange(0, 4):
+		ColumnToXor = StateMatrix[:, ColumnSelector]
+		for ElementSelector in xrange(0, 4):
+			ElementToXORfromStateMatrix                  = "{0:08b}".format(int(ColumnToXor[ElementSelector]))
+			ElementToXORfromPrevColumn                   = "{0:08b}".format(int(ArrayToXORWith[ElementSelector]))
+			StateMatrix[ElementSelector, ColumnSelector] = int(ElementToXORfromStateMatrix, 2) ^ int(ElementToXORfromPrevColumn, 2)
+		ArrayToXORWith	= StateMatrix[:, ColumnSelector]
 
-	NewRoundKey = (StateMatrix.transpose()).reshape(1,16)
-	#print NewRoundKey
-	NextRoundKey = ""
-	
-	for i in NewRoundKey[0]:
-		HexChar = "{0:02x}".format(int(i))
-		NextRoundKey = NextRoundKey + HexChar
-		#Hexchar = hex(i)
-		#print Hexchar
+	NewRoundKey = (StateMatrix.transpose()).reshape(1, 16)
+	RoundKeyHexString = ""
 
-	#print NextRoundKey
+	for DecimalCharacter in NewRoundKey[0]:
+		HexCharacter = "{0:02x}".format(int(DecimalCharacter))
+		RoundKeyHexString = RoundKeyHexString + HexCharacter
+	return RoundKeyHexString, KeyMatrix
 
-	return NextRoundKey,KeyMatrix
+#============================================================================================================
 
-	# print "===================================================="
-	
 def SetupPhase():
-	RoundConstIndex = 0
-	KeyMatrixSize  = (11,16)
-	StateMatrixSize = (4,4)
-	KeyMatrix = np.zeros(KeyMatrixSize)
-	StateMatrix  = np.zeros(StateMatrixSize)
-    
-	PT_Length = SetMessageLength()
-	PT = CreateMessage(PT_Length)
-	K  = GenerateKey()
-
-	#K = "ffffffffffffffffffffffffffffffff" 
+	CurrentRoundIndex = 0
+	KeyMatrixSize     = (11, 16)
+	StateMatrixSize   = (4, 4)
+	KeyMatrix         = np.zeros(KeyMatrixSize)
+	StateMatrix       = np.zeros(StateMatrixSize)
 	
-	K= "000102030405060708090a0b0c0d0e0f"
-	print K
-	for RoundConstIndex in xrange(0,11):
-		K,KeyMatrix = KeyExpansionAlgorithm(K, KeyMatrix,RoundConstIndex)
+	PT_Length         = SetMessageLength()
+	PT                = CreateMessage(PT_Length)
+	MainKey           = GenerateMasterKey()
+	
+	MainKey           = "000102030405060708090a0b0c0d0e0f"
+
+	for CurrentRoundIndex in xrange(0, 11):
+		MainKey, KeyMatrix = KeyExpansionAlgorithm(MainKey, KeyMatrix, CurrentRoundIndex)
 	print KeyMatrix
 
-sbox = np.zeros(256)
-sbox[:] = [0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
+
+sbox           = np.zeros(256)
+sbox[:]        = [0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
 0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
 0xB7, 0xFD, 0x93, 0x26, 0x36, 0x3F, 0xF7, 0xCC, 0x34, 0xA5, 0xE5, 0xF1, 0x71, 0xD8, 0x31, 0x15,
 0x04, 0xC7, 0x23, 0xC3, 0x18, 0x96, 0x05, 0x9A, 0x07, 0x12, 0x80, 0xE2, 0xEB, 0x27, 0xB2, 0x75,
@@ -123,11 +116,10 @@ sbox[:] = [0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2
 0xBA, 0x78, 0x25, 0x2E, 0x1C, 0xA6, 0xB4, 0xC6, 0xE8, 0xDD, 0x74, 0x1F, 0x4B, 0xBD, 0x8B, 0x8A,
 0x70, 0x3E, 0xB5, 0x66, 0x48, 0x03, 0xF6, 0x0E, 0x61, 0x35, 0x57, 0xB9, 0x86, 0xC1, 0x1D, 0x9E,
 0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF,
-0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16 ]
-sboxTable = sbox.reshape((16,16))
+0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16]
+sboxTable      = sbox.reshape((16, 16))
 RoundConstants = np.zeros(10)
-RoundConstants = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x00] 
+RoundConstants = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x00]
 
 
 SetupPhase()
-

@@ -10,48 +10,53 @@ import random
 #============================================================================================================
 
 def CreateMessage(): 
-	StateMatrix_PT 			    = np.zeros(StateSize)
-	choice 						=  input("(1) Random Message, (2) Input Message? ")
-	if choice   				== 1:
-		PlainText_Length 		= input("Please Enter size of message to be encrypted: ")
-		GenBits 				= random.getrandbits(PlainText_Length)
-		PT 						= "{0:032x}".format(GenBits, 'x')
+	StateMatrix_PT              = np.zeros(StateSize)
+	choice                      =  input("(1) Random Message, (2) Input Message?, (3) Default PlainText ? ")
+	if choice                   == 1:
+		PlainText_Length        = 128
+		GenBits                 = random.getrandbits(PlainText_Length)
+		PT                      = "{0:032x}".format(GenBits, 'x')
+	elif choice                == 3:
+		# MainKey              = "000102030405060708090a0b0c0d0e0f"
+		PT                      = "54776F204F6E65204E696E652054776F"
 	else:
-		PT 						=  raw_input("What is your Message? (Please Input a Hex String)")
+		PT                      =  raw_input("What is your Message? (Please Input a Hex String of 128 bits)")
 	
-	# print "The Message To be Encrypted is: ", PT
 	return PT
 
 
 def GenerateMasterKey():
-	choice 					   =  input("(1) Random Key, (2) Input Key? ")
-	if choice   			   == 1:
-		GenBits 			   = random.getrandbits(128)
-		MainKey    	 		   = "{0:032x}".format(GenBits, 'x')
+	choice                     =  input("(1) Random Key, (2) Input Key?, (3) Default Test key ?")
+	if choice                  == 1:
+		GenBits                = random.getrandbits(128)
+		MainKey                = "{0:032x}".format(GenBits, 'x')
+	elif choice                == 3:
+		# MainKey              = "000102030405060708090a0b0c0d0e0f"
+		MainKey                = "5468617473206D79204B756E67204675"
 	else:
-		MainKey 			   = raw_input("What is your Key? (Please Input a Hex String)")
-	
-	# print "The Key to be used is: ", MainKey
-	# print "\n"
+		MainKey                = raw_input("What is your Key? (Please Input a Hex String of 128 bits)")
+
 	return MainKey
 
 
 def PrepareStateMatrix(HexStringRecieved):
-	StateMatrix 			   = np.zeros(StateSize)
+	StateMatrix                = np.zeros(StateSize)
 	for i in range(0, len(HexStringRecieved), 2):
 		ByteExtracted                       = int(HexStringRecieved[i:i + 2], 16)
 		StateMatrix[(i / 2) % 4, i / 8]     = ByteExtracted
+	
 	return StateMatrix
 
 
 def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
-	StateSize   			  = (4, 4)
-	StateMatrix 			  = np.zeros(StateSize)
-	ArrayIndex  			  = 0
+	StateSize                 = (4, 4)
+	StateMatrix               = np.zeros(StateSize)
+	ArrayIndex                = 0
 
 #============================================================================================================
 #============================================================================================================
 	# Step 0 of KeyGen : Creating State Matrix and adding the previous Round Key to KeyMatrix
+	
 	StateMatrix = PrepareStateMatrix(Key)
 	for i in range(0, len(Key), 2):
 		ByteExtracted                       = int(Key[i:i + 2], 16)
@@ -60,6 +65,7 @@ def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
 #============================================================================================================
 #============================================================================================================
 	# Step 1 of KeyGen : Rotate the Last column
+	
 	LastColumnInStateMatrix = StateMatrix[:, 3]
 	LastColumnInStateMatrix = np.roll(LastColumnInStateMatrix, -1)
 
@@ -67,6 +73,7 @@ def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
 #============================================================================================================
 	# Step 2 of KeyGen : Substitute the Rotated Column with the corresponding
 	# SBOX values
+	
 	for element in LastColumnInStateMatrix:
 		CorrespondingColumnInSBOX              = int(element / 16)
 		CorrespondingRowInSBOX                 = int(element % 16)
@@ -75,6 +82,7 @@ def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
 #============================================================================================================
 #============================================================================================================
 	# Step 3 of KeyGen : For the first element, XOR with the Round Constant
+	
 		if ArrayIndex == 0:
 			RoundMultiplier                     = "{0:08b}".format(int(RoundConstants[CurrentRoundIndex]))
 			FirstElementinLastColumn            = "{0:08b}".format(int(LastColumnInStateMatrix[ArrayIndex]))
@@ -84,6 +92,7 @@ def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
 #============================================================================================================
 #============================================================================================================
 	# Step 4 of KeyGen : XOR each column of the State Matrix with the LatestGeneratedColumn
+	
 	ArrayToXORWith = np.zeros(4)
 	ArrayToXORWith = LastColumnInStateMatrix
 
@@ -93,67 +102,133 @@ def KeyExpansionAlgorithm(Key, KeyMatrix, CurrentRoundIndex):
 			ElementToXORfromStateMatrix                  = "{0:08b}".format(int(ColumnToXor[ElementSelector]))
 			ElementToXORfromPrevColumn                   = "{0:08b}".format(int(ArrayToXORWith[ElementSelector]))
 			StateMatrix[ElementSelector, ColumnSelector] = int(ElementToXORfromStateMatrix, 2) ^ int(ElementToXORfromPrevColumn, 2)
-		ArrayToXORWith	= StateMatrix[:, ColumnSelector]
+		ArrayToXORWith  = StateMatrix[:, ColumnSelector]
 
 	NewRoundKey = (StateMatrix.transpose()).reshape(1, 16)
 	RoundKeyHexString = ""
 
+	# Step 4.5 of KeyGen : Creating Hex string of the new Round Key
 	for DecimalCharacter in NewRoundKey[0]:
 		HexCharacter = "{0:02x}".format(int(DecimalCharacter))
 		RoundKeyHexString = RoundKeyHexString + HexCharacter
 	
-
-
 	return RoundKeyHexString, KeyMatrix
 
 #============================================================================================================
+#============================================================================================================
+def ConvertRoundKeyToHexString(RoundKeyToBeUsed):
+	RoundKeyHexString = ""
+	for DecimalCharacter in RoundKeyToBeUsed:
+		HexCharacter      = "{0:02x}".format(int(DecimalCharacter))
+		RoundKeyHexString = RoundKeyHexString + HexCharacter
+	return RoundKeyHexString
+#============================================================================================================
+def AddRoundKey(Roundkey, PT):
+	for row in xrange(0,4):
+		for col in xrange(0,4):
+			ElementToXORfromRoundKey = "{0:08b}".format(int(Roundkey[row,col]))
+			ElementToXORfromPT       = "{0:08b}".format(int(PT[row,col]))
+			CipherText[row, col]     = int(ElementToXORfromRoundKey, 2) ^ int(ElementToXORfromPT, 2)
+	return CipherText
+#============================================================================================================
+def SubByteofStateMatrix(SubstituteThis):
+	for row in xrange(0,4):
+		for col in xrange(0,4):
+			CorrespondingColumnInSBOX = int(SubstituteThis[row,col] / 16)
+			CorrespondingRowInSBOX    = int(SubstituteThis[row,col] % 16)
+			SubstituteThis[row,col]   = sboxTable[CorrespondingColumnInSBOX, CorrespondingRowInSBOX]
+	return SubstituteThis
+#============================================================================================================
+def ShiftRow(CipherText):
+	CipherText[1,:] = np.roll(CipherText[1,:],-1)
+	CipherText[2,:] = np.roll(CipherText[2,:],-2)
+	CipherText[3,:] = np.roll(CipherText[3,:],-3)
+	return CipherText
+#============================================================================================================
+def GFMultiplication(ElementToMultSelectFromCipherText, Multiplicand):
+	GaloisFieldCorrectionForOverflow = 0
+	if Multiplicand == 2 :
+		if (ElementToMultSelectFromCipherText != 0):
+			if (int(math.log(ElementToMultSelectFromCipherText,2)) == 7):
+				GaloisFieldCorrectionForOverflow = 27
+		ElementToMultSelectFromCipherText = (ElementToMultSelectFromCipherText << 1) % 256
+		ElementToMultSelectFromCipherText = (ElementToMultSelectFromCipherText ^ GaloisFieldCorrectionForOverflow) % 256
+	
+	elif Multiplicand == 3 :
+		if (ElementToMultSelectFromCipherText != 0):
+			if (int(math.log(ElementToMultSelectFromCipherText,2)) == 7):
+				GaloisFieldCorrectionForOverflow = 27
+		temp = ElementToMultSelectFromCipherText 
+		ElementToMultSelectFromCipherText = (ElementToMultSelectFromCipherText << 1) % 256
+		ElementToMultSelectFromCipherText = (ElementToMultSelectFromCipherText ^ temp) % 256
+		ElementToMultSelectFromCipherText = (ElementToMultSelectFromCipherText ^ GaloisFieldCorrectionForOverflow) % 256                    
+	else:
+		ElementToMultSelectFromCipherText = ElementToMultSelectFromCipherText 
+	
+	return ElementToMultSelectFromCipherText
+	#============================================================================================================
+def MixColumn(CipherText):
+	MixColArray = [0x02, 0x03, 0x01, 0x01]
+	for row in xrange(0,4):
+		for col in xrange(0,4):
+			sum = 0 
+			for prod in xrange(0,4):                # Iterates over Rows , Selects the Product Term
+				ElementToMultSelectFromCipherText =  int("{0:08b}".format(int(CipherText[prod,col])),2)
+				ElementToMultSelectFromCipherText = GFMultiplication(ElementToMultSelectFromCipherText, MixColArray[prod])              
+				sum = (sum ^ ElementToMultSelectFromCipherText) % 256
 
+			TempMatrix[row,col] = sum
+		MixColArray=np.roll(MixColArray,1)
+	
+	CipherText = TempMatrix
+	return CipherText
+
+#============================================================================================================
+def Encrypt(PT,KeyMatrix):
+	CurrentRoundIndex    = 0
+	StateMatrix_PT       = PrepareStateMatrix(PT)
+	RoundKeyToBeUsed     = KeyMatrix[CurrentRoundIndex,:]
+	RoundKeyHexString    = ConvertRoundKeyToHexString(RoundKeyToBeUsed)
+	StateMatrix_RoundKey = PrepareStateMatrix(RoundKeyHexString)
+	CipherText           = AddRoundKey(StateMatrix_RoundKey, StateMatrix_PT)
+	print "\n"
+
+	for CurrentRoundIndex in xrange(1, 10):
+		CipherText           = SubByteofStateMatrix(CipherText)
+		CipherText           = ShiftRow(CipherText)
+		CipherText           = MixColumn(CipherText)
+		RoundKeyToBeUsed     = KeyMatrix[CurrentRoundIndex,:]
+		RoundKeyHexString    = ConvertRoundKeyToHexString(RoundKeyToBeUsed)
+		StateMatrix_RoundKey = PrepareStateMatrix(RoundKeyHexString)
+		CipherText           = AddRoundKey(StateMatrix_RoundKey, CipherText)
+		print "AES Output after Round  \n",CurrentRoundIndex, "\n",CipherText
+
+	CurrentRoundIndex = 10
+	CipherText           = SubByteofStateMatrix(CipherText)
+	CipherText           = ShiftRow(CipherText)
+	RoundKeyToBeUsed     = KeyMatrix[CurrentRoundIndex,:]
+	RoundKeyHexString    = ConvertRoundKeyToHexString(RoundKeyToBeUsed)
+	StateMatrix_RoundKey = PrepareStateMatrix(RoundKeyHexString)
+	CipherText           = AddRoundKey(StateMatrix_RoundKey, CipherText)
+	print "AES Output after Round  \n",CurrentRoundIndex, "\n",CipherText
+#============================================================================================================
 def SetupPhase():
 	CurrentRoundIndex = 0
 	KeyMatrix         = np.zeros(KeyMatrixSize)
-	
 	MainKey 		  = GenerateMasterKey()
-	#MainKey           = "000102030405060708090a0b0c0d0e0f"			# Input MainKey in Hex String Format
-	
 	for CurrentRoundIndex in xrange(0, 11):
 		MainKey, KeyMatrix = KeyExpansionAlgorithm(MainKey, KeyMatrix, CurrentRoundIndex)	
-	
-	# print "KeyMatrix \n", KeyMatrix
-	# print "\n"
 	return KeyMatrix  												# Obtaining RoundKeys in Decimal of Hex Format
-
 #============================================================================================================
-
-
-
-def Encrypt(PT,KeyMatrix):
-	CurrentRoundIndex = 0
-	RoundKeyHexString = ""
-
-	StateMatrix_PT   = PrepareStateMatrix(PT)
-	# print "PlainTextStateMatrix \n", StateMatrix_PT
-	# print "\n"
-
-	RoundKeyToBeUsed = KeyMatrix[CurrentRoundIndex,:]
-	for DecimalCharacter in RoundKeyToBeUsed:
-		HexCharacter = "{0:02x}".format(int(DecimalCharacter))
-		RoundKeyHexString = RoundKeyHexString + HexCharacter
-
-	# print "\n"
-	# print "RoundKeyHexString", RoundKeyHexString
-	RoundKeyStateMatrix = PrepareStateMatrix(RoundKeyHexString)
+#============================================================================================================
 	
-
-	# print "RoundKeyStateMatrix \n", RoundKeyStateMatrix
-	# print "\n"
-
-
 
 #Main Program Starts Here
 KeyMatrixSize  = (11, 16)
 StateSize      = (4, 4)
-
-Plaintext 	   = np.zeros(16)
+CipherText     = np.zeros(StateSize)
+TempMatrix     = np.zeros(StateSize)
+Plaintext      = np.zeros(16)
 sbox           = np.zeros(256)
 RoundConstants = np.zeros(10)
 KeyMatrix      = np.zeros(KeyMatrixSize)
@@ -181,3 +256,5 @@ RoundConstants = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x
 KeyMatrix  = SetupPhase()
 Plaintext  = CreateMessage()
 CipherText = Encrypt(Plaintext, KeyMatrix) 
+#============================================================================================================
+#============================================================================================================

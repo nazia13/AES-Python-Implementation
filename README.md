@@ -5,7 +5,7 @@ It is implemented in pure python. This code is only intended for recreational pu
 - AES-128 implementation that accepts 16 byte Plaintext and Key and returns the corresponding 16 byte Ciphertext.
 
 # Usage
-  python2 AESImplementation.py
+- python2 AESImplementation.py
   
   
 ### TODO

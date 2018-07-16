@@ -1,4 +1,27 @@
+#!/usr/bin/env python
+
 # Implementation of AES on Python
+
+"""
+    Copyright (C) 2018 Pradeep Venkatachalam
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+"""
+
+
 import math
 import numpy as np
 import random
@@ -20,7 +43,6 @@ def CreateMessage():
 		PT                      =  raw_input("What is your Message? (Please Input a Hex String of 128 bits)")
 	
 	print "PlainText to be used is", PT
-	print "\n"
 	return PT
 #============================================================================================================
 #============================================================================================================
@@ -36,7 +58,6 @@ def GenerateMasterKey():
 		MainKey                = raw_input("What is your Key? (Please Input a Hex String of 128 bits)")
 
 	print "Main Key to be used is", MainKey
-	print "\n"
 	return MainKey
 #============================================================================================================
 #============================================================================================================
@@ -197,7 +218,7 @@ def Encrypt(PT,KeyMatrix):
 	RoundKeyHexString    	 = CreateHexStringFromDecimalArray(RoundKeyToBeUsed)
 	StateMatrix_RoundKey 	 = PrepareStateMatrix(RoundKeyHexString)
 	CipherText           	 = AddRoundKey(StateMatrix_RoundKey, StateMatrix_PT)
-	print "\n"
+
 
 	# Subsequent Rounds of Encryption ( SubByte, Shift Row, Mix Column, Add Round Key )
 	for CurrentRoundIndex in xrange(1, 10):
